@@ -103,6 +103,26 @@ vertice calcularCentroide(forward_list<vertice>& pontos) {
     return centroide;
 }
 
+vertice calcularPontoOrigem(forward_list<vertice>& pontos, bool eixoX){
+	if(eixoX){
+		vertice pontoOrigem = pontos.front();
+			for (forward_list<vertice>::iterator it = pontos.begin(); it != pontos.end(); ++it) {
+	        	if(it->y < pontoOrigem.y){
+					pontoOrigem = *it;
+				}
+			}
+			return pontoOrigem;
+	}else{
+			vertice pontoOrigem = pontos.front();
+			for (forward_list<vertice>::iterator it = pontos.begin(); it != pontos.end(); ++it) {
+	        	if(it->x < pontoOrigem.x){
+					pontoOrigem = *it;
+				}
+			}
+			return pontoOrigem;
+	}
+}
+
 // Defino um ponteiro para a última forma salva no programa
 forma* ultimaForma;
 
@@ -220,6 +240,9 @@ void circunferencia(int cx, int cy, int raio);
 void floodFill(int x1, int x2, Cor cor, Cor novaCor);
 void translacao(int tx, int ty);
 void rotacao(int angulo);
+void escala(float sx, float sy);
+void reflexao(bool eixoX, bool eixoY);
+void cisalhamento(float cx, float cy);
 
 /*
  * Funcao principal
@@ -240,7 +263,7 @@ int main(int argc, char** argv){
   //  Criar submenu de transformações
     int submenuTransf = glutCreateMenu(submenu_transf);
     glutAddMenuEntry("Translação", TRNSLA);
-    glutAddMenuEntry("Escala", ESC);
+    glutAddMenuEntry("Escala", ESCL);
     glutAddMenuEntry("Cisalhamento", CIS);
     glutAddMenuEntry("Reflexão", REFLX);
     glutAddMenuEntry("Rotação", ROT);
@@ -359,6 +382,12 @@ void keyboard(unsigned char key, int x, int y){
 					case ROT:
 						rotacao((angulo+5)%360);
 						break;
+					case ESCL:
+						escala(0.8, 1.0);
+						break;
+					case CIS:
+						cisalhamento(-0.5, 0.0);
+						break;
 				}
 			}
 			break;
@@ -371,6 +400,15 @@ void keyboard(unsigned char key, int x, int y){
 					case ROT:
 						rotacao((angulo-5)%360);
 						break;
+					case ESCL:
+						escala(1.2, 1.0);
+						break;
+					case REFLX:
+						reflexao(false, true);
+						break;
+					case CIS:
+						cisalhamento(0.5, 0.0);
+						break;
 				}
 			}
 			break;
@@ -380,6 +418,15 @@ void keyboard(unsigned char key, int x, int y){
 					case TRNSLA:
 						translacao(0, 10);
 						break;
+					case ESCL:
+						escala(1.0, 1.2);
+						break;
+					case REFLX:
+						reflexao(true, false);
+						break;
+					case CIS:
+						cisalhamento(0.0, 0.5);
+						break;
 				}
 			}
 			break;
@@ -388,6 +435,12 @@ void keyboard(unsigned char key, int x, int y){
 				switch(transformacao){
 					case TRNSLA:
 						translacao(0, -10);
+						break;
+					case ESCL:
+						escala(1, 0.8);
+						break;
+					case CIS:
+						cisalhamento(0.0, -0.5);
 						break;
 				}
 			}
@@ -897,4 +950,104 @@ void rotacao(int angulo){
         }
 	}
 	glutPostRedisplay();
+}
+
+void escala(float sx, float sy){
+	if (!formas.empty()){
+		vertice origem;
+		
+		if(sx == 1) origem = calcularPontoOrigem(ultimaForma->v, true);
+		if(sy == 1) origem = calcularPontoOrigem(ultimaForma->v, false);
+		for (forward_list<vertice>::iterator it = ultimaForma->v.begin(); it != ultimaForma->v.end(); ++it) {
+            // Translada para a origem
+            it->x -= origem.x;
+            it->y -= origem.y;
+
+            // Escala
+            int novoX, novoY;
+            novoX = float(it->x)*sx;
+            novoY = float(it->y)*sy;
+
+            // Atualiza as coordenadas
+            it->x = novoX;
+            it->y = novoY;
+
+            // Translada de volta para a posição original
+            it->x += origem.x;
+            it->y += origem.y;
+        }
+	}
+	glutPostRedisplay();
+}
+
+void reflexao(bool eixoX, bool eixoY){
+	if(eixoX){
+		if (!formas.empty()){
+			vertice centroide = calcularCentroide(ultimaForma->v);
+			
+			for (forward_list<vertice>::iterator it = ultimaForma->v.begin(); it != ultimaForma->v.end(); ++it) {
+	            // Translada para a origem
+	            it->x -= centroide.x;
+	            it->y -= centroide.y;
+	
+	            // Reflete
+				int novoY = it->y*(-1);
+	
+	            // Atualiza as coordenadas
+	            it->y = novoY;
+	
+	            // Translada de volta para a posição original
+	            it->x += centroide.x;
+	            it->y += centroide.y;
+	        }
+		}
+	}else{
+		if (!formas.empty()){
+			vertice centroide = calcularCentroide(ultimaForma->v);
+			
+			for (forward_list<vertice>::iterator it = ultimaForma->v.begin(); it != ultimaForma->v.end(); ++it) {
+	            // Translada para a origem
+	            it->x -= centroide.x;
+	            it->y -= centroide.y;
+	
+	            // Reflete
+				int novoX = it->x*(-1);
+	
+	            // Atualiza as coordenadas
+	            it->x = novoX;
+	
+	            // Translada de volta para a posição original
+	            it->x += centroide.x;
+	            it->y += centroide.y;
+	        }
+		}
+	}
+	glutPostRedisplay();
+}
+
+void cisalhamento(float cx, float cy){
+		if (!formas.empty()){
+			vertice origem;
+		
+			if(cx == 0) origem = calcularPontoOrigem(ultimaForma->v, true);
+		   	if(cy == 0) origem = calcularPontoOrigem(ultimaForma->v, false);
+			for (forward_list<vertice>::iterator it = ultimaForma->v.begin(); it != ultimaForma->v.end(); ++it) {
+	            // Translada para a origem
+	            it->x -= origem.x;
+	            it->y -= origem.y;
+	
+	            // Cisalha
+	            int novoX = it->x + it->y*cx;
+				int novoY = it->y + it->x*cy;
+	
+	            // Atualiza as coordenadas
+	            it->x = novoX;
+	            it->y = novoY;
+	
+	            // Translada de volta para a posição original
+	            it->x += origem.x;
+	            it->y += origem.y;
+	        }
+		}
+		glutPostRedisplay();
 }
