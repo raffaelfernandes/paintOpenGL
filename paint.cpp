@@ -30,16 +30,23 @@ using namespace std;
 #define ESC 27
 #define ENTER 13
 #define DEL 127
+#define letra_d 100
+#define letra_a 97
+#define letra_s 115
+#define letra_w 119
 
 //Enumeracao com os tipos de formas geometricas
-enum tipo_transf{TRSLA = 1, ESCL, CIS, REFLX, ROT};
-enum tipo_forma{LIN = 1, QUAD, TRI, POL, CIR, FLOOD}; // Linha, Triangulo, Poligono, Circulo
+enum tipo_transf{TRNSLA = 1, ESCL, CIS, REFLX, ROT};
+enum tipo_forma{LIN = 1, QUAD, TRI, POL, CIR, TRANSF, FLOOD}; // Linha, Triangulo, Poligono, Circulo
 
 //Verifica se foi realizado o primeiro clique do mouse
 bool click1 = false;
 
 //Verifica se foi realizado o segundo clique do mouse
 bool click2 = false;
+
+//Verifica se foi realizado o terceiro clique do mouse
+bool click3 = false;
 
 int numVertices = 4;
 int cliques = 0;
@@ -48,7 +55,7 @@ int cliques = 0;
 int m_x, m_y;
 
 //Coordenadas do primeiro clique, do segundo clique e do terceiro clique do mouse
-int x_1, y_1, x_2, y_2, x_3, y_3;
+int x_1, y_1, x_2, y_2, x_3, y_3, x_4, y_4;
 // Guarda as cordenadas do clique inicial do polígono
 int x_0, y_0;
 
@@ -58,6 +65,9 @@ forward_list<pair<int, int>> vertices;
 //Indica o tipo de forma geometrica ativa para desenhar
 int modo = LIN;
 int transformacao;
+
+// Define o ângulo da rotação
+int angulo = 0;
 
 //Largura e altura da janela
 int width = 512, height = 512;
@@ -73,6 +83,28 @@ struct forma{
     int tipo;
     forward_list<vertice> v; //lista encadeada de vertices
 };
+
+// Calcular centroide
+vertice calcularCentroide(forward_list<vertice>& pontos) {
+    vertice centroide = {0, 0};
+    int numPontos = 0;
+
+    for (forward_list<vertice>::iterator it = pontos.begin(); it != pontos.end(); ++it) {
+        centroide.x += it->x;
+        centroide.y += it->y;
+        numPontos++;
+	}
+
+    if (numPontos > 0) {
+        centroide.x = round(centroide.x/numPontos);
+        centroide.y = round(centroide.y/numPontos);
+    }
+
+    return centroide;
+}
+
+// Defino um ponteiro para a última forma salva no programa
+forma* ultimaForma;
 
 struct Cor {
     float r, g, b;
@@ -114,6 +146,7 @@ void pushForma(int tipo){
     forma f;
     f.tipo = tipo;
     formas.push_front(f);
+    ultimaForma = &formas.front();
 }
 
 // Funcao para armazenar um vertice na forma do inicio da lista de formas geometricas
@@ -135,7 +168,9 @@ void pushLinha(int x1, int y1, int x2, int y2){
 void pushQuadrilatero(int x1, int y1, int x2, int y2){
     pushForma(QUAD);
     pushVertice(x1, y1);
+    pushVertice(x1, y2);
     pushVertice(x2, y2);
+    pushVertice(x2, y1);
 }
 
 void pushTriangulo(int x1, int y1, int x2, int y2, int x3, int y3){
@@ -178,10 +213,13 @@ void drawFormas();
 void retaImediata(double x1,double y1,double x2,double y2);
 void bresenham(double x1,double y1,double x2,double y2);
 void quadrilatero(int x1, int y1, int x2, int y2);
+void quadrilatero(int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4);
 void triangulo(int x1, int y1, int x2, int y2, int x3, int y3);
 void poligono(forward_list<vertice> v);
 void circunferencia(int cx, int cy, int raio);
 void floodFill(int x1, int x2, Cor cor, Cor novaCor);
+void translacao(int tx, int ty);
+void rotacao(int angulo);
 
 /*
  * Funcao principal
@@ -201,7 +239,7 @@ int main(int argc, char** argv){
     
   //  Criar submenu de transformações
     int submenuTransf = glutCreateMenu(submenu_transf);
-    glutAddMenuEntry("Translação", TRSLA);
+    glutAddMenuEntry("Translação", TRNSLA);
     glutAddMenuEntry("Escala", ESC);
     glutAddMenuEntry("Cisalhamento", CIS);
     glutAddMenuEntry("Reflexão", REFLX);
@@ -275,12 +313,15 @@ void display(void){
  */
 void menu_popup(int value){
     if (value == 0) exit(EXIT_SUCCESS);
+    if (modo == TRANSF && transformacao == ROT) angulo = 0;
     modo = value;
 	glutPostRedisplay();
 }
 
 void submenu_transf(int value){
     if (value == 0) exit(EXIT_SUCCESS);
+    if (transformacao == ROT) angulo = 0;
+    modo = TRANSF;
     transformacao = value;
 	glutPostRedisplay();
 }
@@ -308,6 +349,48 @@ void keyboard(unsigned char key, int x, int y){
 			break;
 		case DEL:
 			formas.clear();
+			break;
+		case letra_a:
+			if(modo == TRANSF){
+				switch(transformacao){
+					case TRNSLA:
+						translacao(-10, 0);
+						break;
+					case ROT:
+						rotacao((angulo+5)%360);
+						break;
+				}
+			}
+			break;
+		case letra_d:
+			if(modo == TRANSF){
+				switch(transformacao){
+					case TRNSLA:
+						translacao(10, 0);
+						break;
+					case ROT:
+						rotacao((angulo-5)%360);
+						break;
+				}
+			}
+			break;
+		case letra_w:
+			if(modo == TRANSF){
+				switch(transformacao){
+					case TRNSLA:
+						translacao(0, 10);
+						break;
+				}
+			}
+			break;
+		case letra_s:
+			if(modo == TRANSF){
+				switch(transformacao){
+					case TRNSLA:
+						translacao(0, -10);
+						break;
+				}
+			}
 			break;
     }
 }
@@ -338,13 +421,24 @@ void mouse(int button, int state, int x, int y){
                 	break;
                  case QUAD:
                     if (state == GLUT_DOWN) {
-                        if (click1) {
+      //               	if (click1 && click2 && click3) {
+      //                       x_4 = x;
+      //                       y_4 = height - y - 1;
+      //                       printf("Clique 2(%d, %d)\n", x_2, y_2);
+      //                       pushQuadrilatero(x_1, y_1, x_2, y_2, x_3, y_3, x_4, y_4);
+      //                       click1 = click2 = click3 = false;
+      //                       glutPostRedisplay();
+						// }else if (click1 && click2) {
+      //                       x_3 = x;
+      //                       y_3 = height - y - 1;
+      //                       printf("Clique 2(%d, %d)\n", x_2, y_2);
+      //                       click3 = true;
+						if (click1) {
                             x_2 = x;
                             y_2 = height - y - 1;
                             printf("Clique 2(%d, %d)\n", x_2, y_2);
                             pushQuadrilatero(x_1, y_1, x_2, y_2);
                             click1 = false;
-                            glutPostRedisplay();
                         } else {
                             click1 = true;
                             x_1 = x;
@@ -520,13 +614,13 @@ void drawFormas() {
             }
             case QUAD: {
                 // Percorre a lista de vertices da forma quadrilátero para desenhar
-                int i = 0, x[2], y[2];
+                int i = 0, x[4], y[4];
                 for (forward_list<vertice>::iterator v = f->v.begin(); v != f->v.end(); v++, i++) {
                     x[i] = v->x;
                     y[i] = v->y;
                 }
                 // Desenha o quadrilátero
-                quadrilatero(x[0], y[0], x[1], y[1]);
+                quadrilatero(x[0], y[0], x[1], y[1], x[2], y[2], x[3], y[3]);
                 break;
             }
             case TRI: {
@@ -672,6 +766,13 @@ void quadrilatero(int x1, int y1, int x2, int y2) {
     bresenham(x2, y1, x1, y1);
 }
 
+void quadrilatero(int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4) {
+    bresenham(x1, y1, x2, y2);
+    bresenham(x2, y2, x3, y3);
+    bresenham(x3, y3, x4, y4);
+    bresenham(x4, y4, x1, y1);
+}
+
 void triangulo(int x1, int y1, int x2, int y2, int x3, int y3){
 	bresenham(x1, y1, x2, y2);
 	bresenham(x2, y2, x3, y3);
@@ -761,4 +862,39 @@ void floodFill(int x, int y, Cor old_col, Cor new_col) {
             pilha.push(std::make_pair(x, y - 1));
         }
     }
+}
+
+void translacao(int tx, int ty){
+	if (!formas.empty()){
+		for (forward_list<vertice>::iterator it = ultimaForma->v.begin(); it != ultimaForma->v.end(); ++it) {
+            it->x = it->x + tx;
+            it->y = it->y + ty;
+        }
+	}
+	glutPostRedisplay();
+}
+
+void rotacao(int angulo){
+	if (!formas.empty()){
+		vertice centroide = calcularCentroide(ultimaForma->v);
+		float rad = angulo * 3.14159 / 180;
+		for (forward_list<vertice>::iterator it = ultimaForma->v.begin(); it != ultimaForma->v.end(); ++it) {
+            // Translada para a origem
+            it->x -= centroide.x;
+            it->y -= centroide.y;
+
+            // Rotaciona
+            int novoX = round((it->x * cos(rad)) - (it->y * sin(rad)));
+            int novoY = round((it->x * sin(rad)) + (it->y * cos(rad)));
+
+            // Atualiza as coordenadas
+            it->x = novoX;
+            it->y = novoY;
+
+            // Translada de volta para a posição original
+            it->x += centroide.x;
+            it->y += centroide.y;
+        }
+	}
+	glutPostRedisplay();
 }
